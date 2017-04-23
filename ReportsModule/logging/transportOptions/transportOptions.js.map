@@ -1,0 +1,1 @@
+{"version":3,"file":"transportOptions.js","sourceRoot":"","sources":["transportOptions.ts"],"names":[],"mappings":";AAAA;IAGI,0BAAY,KAAa;QACrB,IAAI,CAAC,KAAK,GAAG,KAAK,CAAC;IACvB,CAAC;IAEM,mCAAQ,GAAf;QACI,MAAM,CAAC,IAAI,CAAC,KAAK,CAAC;IACtB,CAAC;IAEM,mCAAQ,GAAf,UAAgB,KAAa;QACzB,IAAI,CAAC,KAAK,GAAG,KAAK,CAAC;IACvB,CAAC;IACL,uBAAC;AAAD,CAAC,AAdD,IAcC;AAdY,4CAAgB"}
