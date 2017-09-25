@@ -13,10 +13,11 @@ var XAXIS_HEIGHT = 24;
 var XAXIS_TICKCOUNT = 7;
 var MARGIN = 0;
 var parseDate = d3.time.format('%d-%m-%Y %H:%M').parse;
+var parseLongDate = d3.time.format('%d-%m-%Y %H:%M:%S').parse;
 var ChartsAux = (function () {
     function ChartsAux() {
     }
-    ChartsAux.generateChartTest = function (journals, callback) {
+    ChartsAux.generateChartTest = function (journals, endDate, callback) {
         if (!journals || (journals.length === 0)) {
             callback(null);
         }
@@ -26,31 +27,39 @@ var ChartsAux = (function () {
                     return moment(time, 'DD-MM-YYYY HH:mm').valueOf();
                 }]);
             var scales = function () {
-                var today = moment();
+                var today = moment(endDate, 'DD-MM-YYYY');
                 var width = 673;
                 var height = 87;
-                var endDate = moment();
+                var endDateObject = moment(endDate, 'DD-MM-YYYY');
                 var startDate = today.subtract(6, 'days');
-                endDate.hour(23);
-                endDate.minute(59);
+                endDateObject.hour(23);
+                endDateObject.minute(59);
                 startDate.hour(0);
                 startDate.minute(0);
-                logger.info(endDate.toDate().toString());
+                logger.info(endDateObject.toDate().toString());
                 logger.info(startDate.toDate().toString());
-                var x = d3.time.scale().domain([startDate.toDate(), endDate.toDate()]).range([0, width]);
+                var x = d3.time.scale().domain([startDate.toDate(), endDateObject.toDate()]).range([0, width]);
                 var y = d3.scale.linear().domain([0, 100]).range([height, 0]);
                 return { x: x, y: y };
             };
             var scale_1 = scales();
             var lineConstructor = d3.svg.line()
-                .x(function (d) { return scale_1.x(parseDate(d.sessionDate)); })
+                .x(function (d) {
+                var parsed = parseDate(d.sessionDate);
+                if (!parsed) {
+                    parsed = parseLongDate(d.sessionDate);
+                }
+                return scale_1.x(parsed);
+            })
                 .y(function (d) { return scale_1.y(d.mood); })
                 .interpolate("cardinal")
                 .tension(0.9);
             var flatLineConstructor_1 = d3.svg.line()
                 .x(function (d) {
-                scale_1.x(parseDate(d.sessionDate));
                 var parsed = parseDate(d.sessionDate);
+                if (!parsed) {
+                    parsed = parseLongDate(d.sessionDate);
+                }
                 var valueX = scale_1.x(parsed);
                 return valueX;
             })
@@ -58,8 +67,7 @@ var ChartsAux = (function () {
                 var valueY = scale_1.y(d.mood);
                 return valueY;
             })
-                .interpolate("cardinal")
-                .tension(0.9);
+                .interpolate("linear");
             try {
                 jsdom.env({
                     html: '<body> </body>',
@@ -86,23 +94,23 @@ var ChartsAux = (function () {
                             .attr('class', 'feeling')
                             .attr('d', flatLineConstructor_1(sortedJournals_1)) // set starting position
                             .attr('stroke-width', 2)
-                            .attr("stroke", "#565656")
+                            .attr("stroke", "#ff0066")
                             .attr('fill', 'none');
-                        window.d3.select('g')
-                            .selectAll('.dots').data(sortedJournals_1)
+                        /*window.d3.select('g')
+                            .selectAll('.dots').data(sortedJournals)
                             .enter()
                             .append('circle')
                             .attr('class', 'dots')
-                            .attr('cx', function (d) {
-                            return scale_1.x(parseDate(d.sessionDate));
-                        })
-                            .attr('cy', function (d) {
-                            return scale_1.y(d.mood);
-                        })
+                            .attr('cx', (d) => {
+                                return scale.x(parseDate(d.sessionDate))
+                            })
+                            .attr('cy', (d) => {
+                                return scale.y(d.mood)
+                            })
                             .attr('r', 3)
                             .attr('stroke-width', 0)
                             .attr("stroke", "#565656")
-                            .attr('fill', '#565656');
+                            .attr('fill', '#565656');*/
                         var x = window.d3.select('.container').html();
                         callback(window.d3.select('.container').html());
                     }

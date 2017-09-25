@@ -15,10 +15,11 @@ const XAXIS_TICKCOUNT = 7;
 const MARGIN = 0;
 
 let parseDate = d3.time.format('%d-%m-%Y %H:%M').parse;
+let parseLongDate = d3.time.format('%d-%m-%Y %H:%M:%S').parse;
 
 export class ChartsAux {
 
-    public static generateChartTest(journals, callback) {
+    public static generateChartTest(journals, endDate, callback) {
 
         if (!journals || (journals.length === 0)) {
             callback(null);
@@ -29,22 +30,22 @@ export class ChartsAux {
             }]);
 
             let scales = function () {
-                let today = moment();
-                let width = 673
+                let today = moment(endDate, 'DD-MM-YYYY');
+                let width = 673;
                 let height = 87;
 
-                let endDate = moment();
+                let endDateObject = moment(endDate, 'DD-MM-YYYY');
 
                 let startDate = today.subtract(6, 'days');
 
-                endDate.hour(23);
-                endDate.minute(59);
+                endDateObject.hour(23);
+                endDateObject.minute(59);
                 startDate.hour(0);
                 startDate.minute(0);
 
-                logger.info(endDate.toDate().toString());
+                logger.info(endDateObject.toDate().toString());
                 logger.info(startDate.toDate().toString());
-                let x = d3.time.scale().domain([startDate.toDate(), endDate.toDate()]).range([0, width]);
+                let x = d3.time.scale().domain([startDate.toDate(), endDateObject.toDate()]).range([0, width]);
                 let y = d3.scale.linear().domain([0, 100]).range([height, 0]);
                 return { x, y };
             };
@@ -52,15 +53,23 @@ export class ChartsAux {
             let scale = scales();
 
             let lineConstructor = d3.svg.line()
-                .x(function (d) { return scale.x(parseDate(d.sessionDate)) })
+                .x(function (d) {
+                    let parsed = parseDate(d.sessionDate);
+                    if (!parsed) {
+                        parsed = parseLongDate(d.sessionDate);
+                    }
+                    return scale.x(parsed);
+                })
                 .y(function (d) { return scale.y(d.mood) })
                 .interpolate("cardinal")
                 .tension(0.9);
 
             let flatLineConstructor = d3.svg.line()
                 .x(function (d) {
-                    scale.x(parseDate(d.sessionDate))
                     let parsed = parseDate(d.sessionDate);
+                    if (!parsed) {
+                        parsed = parseLongDate(d.sessionDate);
+                    }
                     let valueX = scale.x(parsed);
                     return valueX;
                 })
@@ -68,8 +77,7 @@ export class ChartsAux {
                     let valueY = scale.y(d.mood);
                     return valueY;
                 })
-                .interpolate("cardinal")
-                .tension(0.9);
+                .interpolate("linear");
 
             try {
                 jsdom.env({
@@ -99,10 +107,10 @@ export class ChartsAux {
                             .attr('class', 'feeling')
                             .attr('d', flatLineConstructor(sortedJournals)) // set starting position
                             .attr('stroke-width', 2)
-                            .attr("stroke", "#565656")
+                            .attr("stroke", "#ff0066")
                             .attr('fill', 'none');
 
-                        window.d3.select('g')
+                        /*window.d3.select('g')
                             .selectAll('.dots').data(sortedJournals)
                             .enter()
                             .append('circle')
@@ -116,7 +124,7 @@ export class ChartsAux {
                             .attr('r', 3)
                             .attr('stroke-width', 0)
                             .attr("stroke", "#565656")
-                            .attr('fill', '#565656');
+                            .attr('fill', '#565656');*/
 
                         let x = window.d3.select('.container').html();
 

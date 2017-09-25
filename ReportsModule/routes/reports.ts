@@ -1,45 +1,18 @@
 ﻿"use strict";
+import moment = require('moment');
+
 var express = require('express');
 var path = require('path');
 
-var mailgun = require('mailgun-js')({ apiKey: 'key-8322e752561e645afc7878a0b4311c7b', domain: 'mg.aryaapp.co' });
+var mailgun = require('mailgun-js')({
+    apiKey: 'key-8322e752561e645afc7878a0b4311c7b', domain: 'mg.aryaapp.co' });
 
 var router = express.Router();
 
 var pdfReportAux = require('../helper/pdfReportAux').PdfReportAux;
 var dataAux = require('../helper/dataAux').DataAux;
 
-router.post('/weeklyReport',(req, res, next) => {
-
-    var parameters = req.body;
-    var email = parameters.email;
-
-    var data = parameters.data;
-
-    pdfReportAux.byDemandReport(data, parameters.target, (doc) => {
-        if (!doc) {
-            res.json({ response: 'error, nothing done' });
-        } else {
-            var buffers = [];
-            doc.on('data', buffers.push.bind(buffers));
-            doc.on('end', function () {
-                var pdfBuffer = Buffer.concat(buffers);
-                var pdfBase64String = pdfBuffer.toString('base64');
-
-                var attachment = {
-                    data: pdfBase64String,
-                    filename: 'report.pdf',
-                };
-                var pdfFile = new mailgun.Attachment({
-                    data: pdfBuffer,
-                    filename: 'report.pdf',
-                    contentType: 'application/pdf'
-                });
-                var data = {
-                    from: 'Arya App Team <info@aryaapp.co>',
-                    to: email,
-                    subject: 'Deine Wochenübersicht',
-                    html: `<!doctype html>
+const emailTemplate = `<!doctype html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
     <!-- NAME: 1 COLUMN -->
@@ -761,7 +734,39 @@ router.post('/weeklyReport',(req, res, next) => {
         </table>
     </center>
 </body>
-</html>`,
+</html>`;
+
+router.post('/weeklyReport',(req, res, next) => {
+
+    var parameters = req.body;
+    var email = parameters.email;
+
+    var data = parameters.data;
+
+    pdfReportAux.byDemandReport(data, parameters.target, (doc) => {
+        if (!doc) {
+            res.json({ response: 'error, nothing done' });
+        } else {
+            var buffers = [];
+            doc.on('data', buffers.push.bind(buffers));
+            doc.on('end', function () {
+                var pdfBuffer = Buffer.concat(buffers);
+                var pdfBase64String = pdfBuffer.toString('base64');
+
+                var attachment = {
+                    data: pdfBase64String,
+                    filename: 'report.pdf',
+                };
+                var pdfFile = new mailgun.Attachment({
+                    data: pdfBuffer,
+                    filename: 'report.pdf',
+                    contentType: 'application/pdf'
+                });
+                var data = {
+                    from: 'Arya App Team <info@aryaapp.co>',
+                    to: email,
+                    subject: 'Deine Wochenübersicht',
+                    html: emailTemplate,
                     attachment: pdfFile,
                 };
 
@@ -778,6 +783,68 @@ router.post('/weeklyReport',(req, res, next) => {
         }
 
     }); 
+});
+
+router.post('/fullReport', (req, res) => {
+
+    var parameters = req.body;
+    var email = parameters.email;
+
+    var data = parameters.data;
+    var endDate = parameters.endDate;
+    if (!endDate) {
+        endDate = moment().format('DD-MM-YYYY');
+    }
+    pdfReportAux.byDemandFullReport(data, parameters.target, endDate, (doc) => {
+        if (!doc) {
+            res.json({ response: 'error, nothing done' });
+        } else {
+            try {
+                var chunks = [];
+                doc.on('data', function (chunk) {
+                    chunks.push(chunk)
+                })
+                doc.on('end', function () {
+                    var pdfBuffer = Buffer.concat(chunks);
+                    var pdfBase64String = pdfBuffer.toString('base64');
+
+                    var attachment = {
+                        data: pdfBase64String,
+                        filename: 'report.pdf',
+                    };
+
+                    var pdfFile = new mailgun.Attachment({
+                        data: pdfBuffer,
+                        filename: 'report.pdf',
+                        contentType: 'application/pdf'
+                    });
+
+                    var data = {
+                        from: 'Arya App Team <info@aryaapp.co>',
+                        to: email,
+                        subject: 'Deine Wochenübersicht',
+                        html: emailTemplate,
+                        attachment: pdfFile,
+                    };
+
+                    mailgun.messages().send(data, function (error, body) {
+                        if (error) {
+                            res.json({ response: error });
+                        } else {
+                            console.log(body);
+                            res.json({ response: 'ok' });
+                        }
+                    });
+
+                });
+                doc.end();
+            } catch (error) {
+                res.json({ response: error });
+            }
+
+           
+        }
+    });
 });
 
 module.exports = router;

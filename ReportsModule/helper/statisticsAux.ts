@@ -12,10 +12,42 @@ export class StatisticsAux {
         let weekendsAfternoon = [];
         let weekendsEvening = [];
 
-        journals.forEach((journal) => {
-            let sessionDate = moment(journal.sessionDate, 'DD-MM-YYYY HH:mm');
+        let bodyStatistics = [];
+        let allBodyParts = [];
 
-            if (sessionDate.day() > 4) {
+        journals.forEach((journal) => {
+
+            let bodyAnswer = _.find(journal.questions, { type: 'BS' });
+            if (bodyAnswer) {
+                let bodySymptons = JSON.parse(bodyAnswer.answer)
+                _.forEach(bodySymptons, (value, key) => {
+
+                    let partExists = _.find(allBodyParts, key);
+                    if (!partExists && value.length > 0) {
+                        allBodyParts.push(key);
+                    }
+
+                    _.forEach(value, (symptom) => {
+
+                        let bodySymptomPack = _.find(bodyStatistics, { bodyPart: key, symptom });
+                        if (bodySymptomPack) {
+                            let bodySymptomPackIndex = _.indexOf(bodyStatistics, bodySymptomPack);
+                            bodySymptomPack.amount += 1;
+                            bodyStatistics.splice(bodySymptomPackIndex, 1, bodySymptomPack);
+                        } else {
+                            bodyStatistics.push({
+                                bodyPart: key, 
+                                symptom,
+                                amount: 1,
+                            });
+                        }
+
+                    });
+                });
+            }
+
+            let sessionDate = moment(journal.sessionDate, 'DD-MM-YYYY HH:mm');
+            if (sessionDate.day() === 0 || sessionDate.day() === 6 ) {
                 // weekend
                 let hour = sessionDate.hour();
                 if (hour < 6) {
@@ -40,32 +72,75 @@ export class StatisticsAux {
             }
         });
 
+        let testMean = _.meanBy(weekdaysAfternoon, (journal) => {
+            return JSON.parse(journal.mood);
+        });
+
+        bodyStatistics.sort((elementA, elementB) => {
+            return elementB.amount - elementA.amount;
+        });
+        let groupedBodySymptoms = [];
+        let totalOthers = 0;
+        bodyStatistics.forEach((bodySymptom, i) => {
+            if (i < 6) {
+                groupedBodySymptoms.push(bodySymptom);
+            } else {
+                totalOthers += bodySymptom.amount;
+            }
+        });
+
+        if (totalOthers > 0) {
+            groupedBodySymptoms.push({
+                symptom: 'other',
+                bodyPart: '-',
+                amount: totalOthers,
+            });
+        }
+
         return {
-            lowerJournal: _.minBy(journals, 'mood'),
-            higherJournal: _.maxBy(journals, 'mood'),
+            groupedBodySymptoms,
+            allBodyParts,
+            lowerJournal: _.minBy(journals, (journal) => {
+                return JSON.parse(journal.mood);
+            }),
+            higherJournal: _.maxBy(journals, (journal) => {
+                return JSON.parse(journal.mood);
+            }),
             morningWeekday: {
                 totalJournals: weekdaysMorning.length,
-                averageMood: _.meanBy(weekdaysMorning, 'mood'),
+                averageMood: (weekdaysMorning.length) ? _.meanBy(weekdaysMorning, (journal) => {
+                    return JSON.parse(journal.mood);
+                }) : 0,
             },
             afternoonWeekday: {
                 totalJournals: weekdaysAfternoon.length,
-                averageMood: _.meanBy(weekdaysAfternoon, 'mood'),
+                averageMood: (weekdaysAfternoon.length) ? _.meanBy(weekdaysAfternoon, (journal) => {
+                    return JSON.parse(journal.mood);
+                }): 0,
             },
             eveningWeekday: {
                 totalJournals: weekdaysEvening.length,
-                averageMood: _.meanBy(weekdaysEvening, 'mood'),
+                averageMood: (weekdaysEvening.length) ? _.meanBy(weekdaysEvening, (journal) => {
+                    return JSON.parse(journal.mood);
+                }): 0,
             },
             morningWeekend: {
                 totalJournals: weekendsMorning.length,
-                averageMood: _.meanBy(weekendsMorning, 'mood'),
+                averageMood: (weekendsMorning.length) ? _.meanBy(weekendsMorning, (journal) => {
+                    return JSON.parse(journal.mood);
+                }) : 0,
             },
             afternoonWeekend: {
                 totalJournals: weekendsAfternoon.length,
-                averageMood: _.meanBy(weekendsAfternoon, 'mood'),
+                averageMood: (weekendsAfternoon.length) ? _.meanBy(weekendsAfternoon, (journal) => {
+                    return JSON.parse(journal.mood);
+                }) : 0,
             },
             eveningWeekend: {
                 totalJournals: weekendsEvening.length,
-                averageMood: _.meanBy(weekendsEvening, 'mood'),
+                averageMood: (weekendsEvening.length) ? _.meanBy(weekendsEvening, (journal) => {
+                    return JSON.parse(journal.mood);
+                }) : 0,
             },
         }
     }
@@ -82,7 +157,28 @@ export class StatisticsAux {
         let popular2;
         let popular3;
         let popular4;
+        let activitiesOrdered = [];
+        let sumOthers = 0;
 
+        ordered.forEach((activityGroup, i) => {
+            if (i < 9) {
+                activitiesOrdered.push({
+                    amount: activityGroup.length,
+                    activity: activityGroup[0],
+                });
+            } else {
+                sumOthers += activityGroup.length;
+            }
+        });
+
+        if (sumOthers > 0) {
+            activitiesOrdered.push({
+                amount: sumOthers,
+                activity: {
+                    activityName: 'Other',
+                }, 
+            });
+        }
         if (ordered.length > 0) {
             popular1 = {
                 amount: ordered[0].length,
@@ -118,114 +214,113 @@ export class StatisticsAux {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
-
-            return (day <= 4 && hour < 3);
+            return (day !== 0 && day !== 6 && hour < 3);
         }));
         weekdayByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
 
-            return (day <= 4 && hour < 6 && hour >= 3);
+            return (day !== 0 && day !== 6 && hour < 6 && hour >= 3);
         }));
         weekdayByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
 
-            return (day <= 4 && hour < 9 && hour >= 6);
+            return (day !== 0 && day !== 6 && hour < 9 && hour >= 6);
         }));
         weekdayByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
 
-            return (day <= 4 && hour < 12 && hour >= 9);
+            return (day !== 0 && day !== 6 && hour < 12 && hour >= 9);
         }));
         weekdayByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
 
-            return (day <= 4 && hour < 15 && hour >= 12);
+            return (day !== 0 && day !== 6 && hour < 15 && hour >= 12);
         }));
         weekdayByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
 
-            return (day <= 4 && hour < 18 && hour >= 15);
+            return (day !== 0 && day !== 6 && hour < 18 && hour >= 15);
         }));
         weekdayByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
 
-            return (day <= 4 && hour < 21 && hour >= 18);
+            return (day !== 0 && day !== 6 && hour < 21 && hour >= 18);
         }));
         weekdayByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
 
-            return (day <= 4 && hour >= 21);
+            return (day !== 0 && day !== 6 && hour >= 21);
         }));
 
         weekendByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
-
-            return (day > 5 && hour < 3);
+            
+            return ((day === 0 || day === 6) && hour < 3);
         }));
         weekendByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
 
-            return (day > 4 && hour < 6 && hour >= 3);
+            return ((day === 0 || day === 6) && hour < 6 && hour >= 3);
         }));
         weekendByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
 
-            return (day > 4 && hour < 9 && hour >= 6);
+            return ((day === 0 || day === 6) && hour < 9 && hour >= 6);
         }));
         weekendByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
 
-            return (day > 4 && hour < 12 && hour >= 9);
+            return ((day === 0 || day === 6) && hour < 12 && hour >= 9);
         }));
         weekendByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
 
-            return (day > 4 && hour < 15 && hour >= 12);
+            return ((day === 0 || day === 6) && hour < 15 && hour >= 12);
         }));
         weekendByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
 
-            return (day > 4 && hour < 18 && hour >= 15);
+            return ((day === 0 || day === 6) && hour < 18 && hour >= 15);
         }));
         weekendByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
 
-            return (day > 4 && hour < 21 && hour >= 18);
+            return ((day === 0 || day === 6) && hour < 21 && hour >= 18);
         }));
         weekendByHour.push(_.filter(activities, (activity) => {
             let sessionDate = moment(activity.sessionDate, 'DD-MM-YYYY HH:mm');
             let hour = sessionDate.hour();
             let day = sessionDate.day();
 
-            return (day > 4 && hour >= 21);
+            return ((day === 0 || day === 6) && hour >= 21);
         }));
 
         let weekOverView = [];
@@ -256,6 +351,7 @@ export class StatisticsAux {
         });
 
         return {
+            activitiesOrdered,
             popular1,
             popular2,
             popular3,
