@@ -785,13 +785,33 @@ router.post('/weeklyReport',(req, res, next) => {
     }); 
 });
 
+function sendReportEmail(pdfBuffer, email, callback) {
+    var pdfFile = new mailgun.Attachment({
+        data: pdfBuffer,
+        filename: 'report.pdf',
+        contentType: 'application/pdf'
+    });
+
+    var data = {
+        from: 'Arya App Team <info@aryaapp.co>',
+        to: email,
+        subject: 'Deine Wochenübersicht',
+        html: emailTemplate,
+        attachment: pdfFile,
+    };
+
+    mailgun.messages().send(data, callback);
+    });
+}
+
 router.post('/fullReport', (req, res) => {
 
     var parameters = req.body;
     var email = parameters.email;
-
+    var suppressEmailSending = parameters.suppressEmailSending;
     var data = parameters.data;
     var endDate = parameters.endDate;
+
     if (!endDate) {
         endDate = moment().format('DD-MM-YYYY');
     }
@@ -805,44 +825,33 @@ router.post('/fullReport', (req, res) => {
                     chunks.push(chunk)
                 })
                 doc.on('end', function () {
-                    var pdfBuffer = Buffer.concat(chunks);
-                    var pdfBase64String = pdfBuffer.toString('base64');
+                    let pdfBuffer = Buffer.concat(chunks);
 
-                    var attachment = {
-                        data: pdfBase64String,
-                        filename: 'report.pdf',
-                    };
-
-                    var pdfFile = new mailgun.Attachment({
-                        data: pdfBuffer,
-                        filename: 'report.pdf',
-                        contentType: 'application/pdf'
-                    });
-
-                    var data = {
-                        from: 'Arya App Team <info@aryaapp.co>',
-                        to: email,
-                        subject: 'Deine Wochenübersicht',
-                        html: emailTemplate,
-                        attachment: pdfFile,
-                    };
-
-                    mailgun.messages().send(data, function (error, body) {
-                        if (error) {
-                            res.json({ response: error });
-                        } else {
-                            console.log(body);
-                            res.json({ response: 'ok' });
-                        }
-                    });
-
+                    if (!suppressEmailSending) {
+                        sendReportEmail(pdfBuffer, email, function (error, body) {
+                            if (error) {
+                                res.json({response: error});
+                            } else {
+                                console.log(body);
+                                res.json({response: 'ok'});
+                            });
+                    } else {
+                        let pdfBase64String = pdfBuffer.toString('base64');
+                        let reportPDF = {
+                            data: pdfBase64String,
+                            filename: 'report.pdf',
+                        };
+                        res.json({
+                            response: 'ok',
+                            data: {
+                                report: reportPDF
+                            }})
+                    }
                 });
                 doc.end();
             } catch (error) {
                 res.json({ response: error });
             }
-
-           
         }
     });
 });
